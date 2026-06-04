@@ -1,5 +1,9 @@
 Flask==3.0.0
-opencv-python-headless==4.8.1.78
+opencv-python-headless==4.10.0.84
 numpy==1.26.4
 matplotlib==3.8.0
 Werkzeug==3.0.1
+torch==2.2.2
+torchvision==0.17.2
+Pillow==10.2.0
+albumentations==1.4.3

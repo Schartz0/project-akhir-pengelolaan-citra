@@ -1,4 +1,4 @@
-# Panduan Penggunaan Aplikasi Histogram Specification
+# Panduan Penggunaan Aplikasi Coral Health Analyzer
 
 ## Menjalankan Aplikasi
 
@@ -16,117 +16,126 @@ Buka browser dan akses: **http://localhost:5000**
 
 ## Cara Menggunakan
 
-### Langkah 1: Upload Gambar Source
-1. Klik tombol "Pilih Gambar" di kotak "Gambar Asli (Source)"
-2. Pilih gambar yang ingin diproses
-3. Preview gambar akan muncul
+### Langkah 1: Upload Gambar
+1. Klik area upload atau seret gambar terumbu karang ke dalam kotak upload
+2. Format yang didukung: JPG, PNG, WEBP (maks 20MB)
+3. Preview gambar akan muncul di bawah area upload beserta nama file dan ukurannya
 
-### Langkah 2: Upload Gambar Target
-1. Klik tombol "Pilih Gambar" di kotak "Gambar Target"
-2. Pilih gambar target (referensi histogram)
-3. Preview gambar akan muncul
+### Langkah 2: Analisis
+1. Klik tombol **"Analisis Sekarang"**
+2. Tunggu proses selesai — loading spinner akan muncul selama model berjalan
+3. Hasil akan ditampilkan otomatis dan halaman scroll ke bagian hasil
 
-### Langkah 3: Proses
-1. Klik tombol "Proses Histogram Specification"
-2. Tunggu proses selesai (loading indicator akan muncul)
-3. Hasil akan ditampilkan secara otomatis
+### Langkah 3: Baca Hasil
+Lihat penjelasan setiap bagian hasil di bawah.
+
+### Langkah 4: Reset
+Klik **"← Analisis Gambar Lain"** untuk menganalisis gambar baru.
+
+---
 
 ## Memahami Hasil
 
-### 1. Gambar Hasil
-Tiga gambar ditampilkan:
-- **Gambar Asli**: Gambar source dalam grayscale
-- **Gambar Target**: Gambar target dalam grayscale
-- **Hasil Specification**: Gambar hasil dengan histogram yang disesuaikan
+### 1. Verdict Card (Hasil Prediksi)
+Kotak berwarna besar yang menampilkan:
+- **Status terumbu karang** dalam Bahasa Indonesia (Sehat / Tidak Sehat / Mati)
+- **Nama kelas Inggris** di bawahnya (Healthy / Unhealthy / Dead)
+- **Confidence** — seberapa yakin model terhadap prediksi ini (dalam %)
+- **Timestamp** — waktu prediksi dilakukan
 
-### 2. Histogram
-Tiga grafik histogram menunjukkan distribusi intensitas piksel:
-- **Histogram Citra Asli** (Biru): Distribusi intensitas gambar asli
-- **Histogram Citra Target** (Hijau): Distribusi intensitas gambar target
-- **Histogram Hasil** (Merah): Distribusi intensitas gambar hasil
+Warna kartu:
+- 🟢 Hijau = Sehat (Healthy)
+- 🟡 Kuning = Tidak Sehat (Unhealthy)
+- 🔴 Merah = Mati (Dead)
 
-### 3. CDF (Cumulative Distribution Function)
-Tiga grafik CDF menunjukkan fungsi distribusi kumulatif:
-- **CDF Citra Asli**: Akumulasi probabilitas gambar asli
-- **CDF Citra Target**: Akumulasi probabilitas gambar target
-- **CDF Hasil**: Akumulasi probabilitas gambar hasil
+### 2. Distribusi Probabilitas
+Dua tampilan untuk distribusi probabilitas ketiga kelas:
 
-### 4. Perbandingan CDF
-Grafik overlay yang menampilkan ketiga CDF dalam satu plot untuk perbandingan visual.
+**Progress Bars:**
+- Bar horizontal per kelas dengan persentase di kanan
+- Kelas prediksi ditampilkan dengan teks tebal
 
-### 5. Tabel Mapping
-Menampilkan 20 nilai pertama dari lookup table:
-- **rₖ**: Intensitas piksel asli (0-19)
-- **CDF Source**: Nilai CDF pada intensitas rₖ
-- **zₖ**: Intensitas hasil mapping
-- **CDF Target**: Nilai CDF target pada intensitas zₖ
-- **Error**: Selisih absolut antara CDF source dan target
+**Donut Chart (Gauge):**
+- Lingkaran dengan persentase confidence di tengah
+- Warna sesuai kelas prediksi
 
-### 6. Tabel Verifikasi
-Menampilkan 11 titik kunci (0, 25, 50, 75, 100, 128, 150, 175, 200, 225, 255):
-- **Intensitas**: Nilai intensitas yang diuji
-- **CDF Asli**: Nilai CDF gambar asli
-- **CDF Target**: Nilai CDF gambar target
-- **CDF Hasil**: Nilai CDF gambar hasil
-- **Status**: 
-  - ✓ MATCH: Perbedaan < 0.05 (sangat baik)
-  - ~ CLOSE: Perbedaan 0.05-0.1 (baik)
-  - ✗ DIFF: Perbedaan > 0.1 (perlu perbaikan)
+**Bar Chart:**
+- Grafik batang perbandingan ketiga kelas
+- Bar kelas prediksi berwarna, sisanya abu-abu
 
-### 7. MSE (Mean Squared Error)
-Nilai MSE antara CDF hasil dan CDF target:
-- **Semakin mendekati 0**: Semakin baik hasil specification
-- **< 0.001**: Excellent
-- **0.001 - 0.01**: Good
-- **> 0.01**: Fair
+### 3. Gambar Original vs Setelah Preprocessing
+Dua gambar side-by-side:
+- **Gambar Original**: Gambar yang diunggah apa adanya
+- **Setelah Preprocessing**: Gambar setelah white balance, dehazing, dan CLAHE
 
-### 8. Log Proses
-Detail lengkap proses algoritma:
-- Langkah 0: Konversi ke grayscale
-- Langkah 1: Menghitung histogram
-- Langkah 2: Normalisasi (PDF)
-- Langkah 3: Hitung CDF
-- Langkah 4: Membuat tabel mapping
-- Langkah 5: Aplikasi transformasi
-- Verifikasi hasil
+Perhatikan perbedaan warna dan kontras — preprocessing dirancang untuk mengoreksi kondisi bawah air.
+
+### 4. Analisis Histogram Preprocessing
+Grafik 4 panel:
+- **Baris atas**: Tampilan gambar (original | preprocessed)
+- **Baris bawah**: Histogram RGB (original | preprocessed)
+
+Histogram memperlihatkan distribusi intensitas channel R, G, B sebelum dan sesudah preprocessing.
+
+### 5. Pipeline Preprocessing
+Daftar 4 langkah teknis yang dijalankan sebelum inferensi:
+1. White Balance (koreksi warna LAB)
+2. Dehazing (Dark Channel Prior)
+3. CLAHE Enhancement
+4. Resize & Normalize (224×224, ImageNet stats)
+
+---
+
+## Interpretasi Kelas
+
+| Kelas | Kondisi | Indikator Visual |
+|-------|---------|-----------------|
+| **Sehat** | Terumbu karang hidup, warna cerah, struktur utuh | Warna coral/orange/ungu cerah |
+| **Tidak Sehat** | Pemutihan parsial atau tekanan lingkungan | Warna pucat sebagian, struktur masih ada |
+| **Mati** | Terumbu karang sudah tidak hidup | Dominan putih/abu, tidak ada warna hidup |
+
+---
 
 ## Tips Penggunaan
 
-### Memilih Gambar Source
-- Gunakan gambar dengan kontras rendah untuk hasil terbaik
-- Format: JPG, PNG, JPEG
-- Ukuran maksimal: 16MB
+### Kualitas Gambar
+- Gunakan gambar dengan pencahayaan cukup
+- Hindari gambar yang terlalu buram atau gelap
+- Resolusi minimum yang disarankan: 224×224 piksel
+- Model dilatih dengan gambar underwater — hasil terbaik pada foto bawah air
 
-### Memilih Gambar Target
-- Pilih gambar dengan distribusi histogram yang diinginkan
-- Gambar target menentukan karakteristik histogram hasil
-- Contoh: Gambar dengan kontras tinggi untuk meningkatkan kontras
+### Confidence Rendah
+Jika confidence < 60%, pertimbangkan:
+- Gambar terlalu buram atau terdistorsi
+- Objek dalam gambar bukan terumbu karang
+- Sudut pengambilan tidak ideal
 
-### Interpretasi Hasil
-1. **Histogram**: Perhatikan perubahan distribusi intensitas
-2. **CDF**: CDF hasil harus mendekati CDF target
-3. **MSE**: Nilai kecil menunjukkan specification berhasil
-4. **Status Verifikasi**: Mayoritas harus MATCH atau CLOSE
+### Batch Analisis
+Untuk menganalisis banyak gambar, ulangi proses upload satu per satu menggunakan tombol reset di bawah hasil.
+
+---
 
 ## Troubleshooting
 
-### Error: "Kedua gambar harus diupload"
-- Pastikan kedua gambar (source dan target) sudah dipilih
+### Error: "Gambar harus diupload"
+- Pastikan sudah memilih atau menyeret file gambar ke area upload
 
-### Error: "Tidak ada file yang dipilih"
-- Klik tombol "Pilih Gambar" dan pilih file
+### Error: "Gagal membaca gambar"
+- Pastikan file adalah gambar valid (JPG/PNG/WEBP)
+- Coba dengan file lain untuk memastikan format didukung
 
 ### Proses Lambat
-- Gambar besar membutuhkan waktu lebih lama
-- Resize gambar jika terlalu besar (>2000x2000 piksel)
+- Model pertama kali di-load saat startup, request berikutnya lebih cepat
+- Gunakan CPU yang lebih cepat atau aktifkan GPU (CUDA) untuk inferensi lebih cepat
 
-### Hasil Tidak Sesuai
-- Coba gambar target yang berbeda
-- Pastikan gambar target memiliki karakteristik yang diinginkan
+### Model Tidak Ditemukan
+- Pastikan file `best_coral_model.pth` ada di direktori yang sama dengan `app.py`
 
-## Referensi Algoritma
+---
 
-Algoritma berdasarkan:
-- Gonzalez & Woods - Digital Image Processing
-- Histogram Specification (Histogram Matching)
-- Inverse CDF Mapping Technique
+## Referensi Teknis
+
+- **Arsitektur Model**: ResNet-50 (He et al., 2016)
+- **Dehazing**: Dark Channel Prior (He et al., 2011)
+- **CLAHE**: Contrast Limited Adaptive Histogram Equalization (Zuiderveld, 1994)
+- **Framework**: PyTorch, albumentations, OpenCV

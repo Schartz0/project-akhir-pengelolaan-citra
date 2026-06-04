@@ -7,249 +7,255 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from io import BytesIO
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models
+from PIL import Image
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+from datetime import datetime
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB max
 
-# Batas panjang sisi terpanjang gambar untuk display (bukan untuk komputasi)
+# ─── DEVICE ────────────────────────────────────────────────────────────────────
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# ─── KONSTANTA ─────────────────────────────────────────────────────────────────
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'best_coral_model.pth')
+CLASS_NAMES = ['Healthy', 'Unhealthy', 'Dead']
+CLASS_LABELS_ID = {
+    'Healthy':   'Sehat',
+    'Unhealthy': 'Tidak Sehat',
+    'Dead':      'Mati',
+}
+CLASS_COLORS = {
+    'Healthy':   '#27ae60',
+    'Unhealthy': '#f39c12',
+    'Dead':      '#e74c3c',
+}
 DISPLAY_MAX_SIZE = 800
 
+# ─── LOAD MODEL (sekali saja saat startup) ─────────────────────────────────────
+def load_model(model_path):
+    model = models.resnet50(weights=None)
+    num_features = model.fc.in_features
+    model.fc = nn.Linear(num_features, 3)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model = model.to(device)
+    model.eval()
+    print(f"[INFO] Model loaded dari: {model_path}")
+    print(f"[INFO] Device: {device}")
+    return model
+
+predictor_model = load_model(MODEL_PATH)
+
+# ─── TRANSFORM ─────────────────────────────────────────────────────────────────
+transform = A.Compose([
+    A.Resize(224, 224),
+    A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ToTensorV2()
+])
+
+# ─── PREPROCESSING FUNCTIONS ───────────────────────────────────────────────────
+def white_balance(img):
+    """White balance menggunakan LAB color space."""
+    result = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+    avg_a = np.mean(result[:, :, 1])
+    avg_b = np.mean(result[:, :, 2])
+    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(result, cv2.COLOR_LAB2RGB)
+
+def clahe_enhance(img, clip_limit=2.0, tile_size=8):
+    """CLAHE contrast enhancement."""
+    lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_size, tile_size))
+    l = clahe.apply(l)
+    enhanced = cv2.merge([l, a, b])
+    return cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
+
+def dehaze_dark_channel(img, omega=0.95, t0=0.1):
+    """Dark channel prior dehazing untuk koreki underwater."""
+    img_norm = img.astype(np.float32) / 255.0
+    dark = np.min(img_norm, axis=2)
+    dark = cv2.GaussianBlur(dark, (15, 15), 0)
+    atmospheric = np.percentile(dark, 95)
+    if atmospheric < 1e-6:
+        atmospheric = 1e-6
+    transmission = 1 - omega * dark / atmospheric
+    transmission = np.clip(transmission, t0, 1)
+    result = np.zeros_like(img_norm)
+    for i in range(3):
+        result[:, :, i] = (img_norm[:, :, i] - atmospheric) / transmission + atmospheric
+    return np.clip(result * 255, 0, 255).astype(np.uint8)
+
+def full_preprocess(img_rgb):
+    """Pipeline preprocessing lengkap: white balance → dehaze → CLAHE."""
+    img = white_balance(img_rgb)
+    img = dehaze_dark_channel(img)
+    img = clahe_enhance(img)
+    return img
+
+# ─── HELPER ────────────────────────────────────────────────────────────────────
 def resize_for_display(img):
-    """Resize gambar hanya untuk keperluan display, bukan komputasi."""
     h, w = img.shape[:2]
     if max(h, w) <= DISPLAY_MAX_SIZE:
         return img
     scale = DISPLAY_MAX_SIZE / max(h, w)
-    new_w = int(w * scale)
-    new_h = int(h * scale)
-    return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
-def img_to_base64(img, quality=85):
-    """Encode gambar ke JPEG base64 untuk transfer yang lebih ringan."""
-    display_img = resize_for_display(img)
-    _, buffer = cv2.imencode('.jpg', display_img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+def img_to_base64(img_rgb, quality=85):
+    """RGB numpy array → base64 JPEG string."""
+    display = resize_for_display(img_rgb)
+    img_bgr = cv2.cvtColor(display, cv2.COLOR_RGB2BGR)
+    _, buffer = cv2.imencode('.jpg', img_bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     return "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
 
 def plot_to_base64(fig):
-    """Simpan figure matplotlib ke base64 PNG dengan DPI rendah."""
     buf = BytesIO()
-    fig.savefig(buf, format='png', dpi=72, bbox_inches='tight')
+    fig.savefig(buf, format='png', dpi=90, bbox_inches='tight')
     buf.seek(0)
     data = base64.b64encode(buf.read()).decode('utf-8')
     plt.close(fig)
     return "data:image/png;base64," + data
 
-def create_histogram_plot(hist_data, title, color):
-    fig, ax = plt.subplots(figsize=(5, 3))
-    ax.bar(range(256), hist_data, color=color, alpha=0.7, width=1)
-    ax.set_title(title, fontsize=10, fontweight='bold')
-    ax.set_xlim([0, 255])
-    ax.set_xlabel('Intensitas', fontsize=8)
-    ax.set_ylabel('Frekuensi', fontsize=8)
-    ax.tick_params(labelsize=7)
-    ax.grid(True, alpha=0.3)
+# ─── PLOT FUNGSI ───────────────────────────────────────────────────────────────
+def create_probability_bar(probabilities, predicted_class):
+    """Bar chart probabilitas ketiga kelas."""
+    fig, ax = plt.subplots(figsize=(6, 3.5))
+    probs = [probabilities[c] * 100 for c in CLASS_NAMES]
+    colors = [CLASS_COLORS[c] if c == predicted_class else '#d0d0d0' for c in CLASS_NAMES]
+    labels_id = [CLASS_LABELS_ID[c] for c in CLASS_NAMES]
+
+    bars = ax.bar(labels_id, probs, color=colors, edgecolor='white', linewidth=1.5, zorder=3)
+    for bar, prob in zip(bars, probs):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
+                f'{prob:.1f}%', ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+    ax.set_ylim([0, 115])
+    ax.set_ylabel('Probabilitas (%)', fontsize=9)
+    ax.set_title('Distribusi Probabilitas Kelas', fontsize=11, fontweight='bold', pad=12)
+    ax.tick_params(labelsize=10)
+    ax.grid(axis='y', alpha=0.3, zorder=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     fig.tight_layout()
     return plot_to_base64(fig)
 
-def create_cdf_plot(cdf_data, title, color, label):
-    fig, ax = plt.subplots(figsize=(5, 3))
-    ax.plot(range(256), cdf_data, color=color, linewidth=2, label=label)
-    ax.set_title(title, fontsize=10, fontweight='bold')
-    ax.set_xlim([0, 255])
-    ax.set_ylim([0, 1])
-    ax.set_xlabel('Intensitas', fontsize=8)
-    ax.set_ylabel('CDF', fontsize=8)
-    ax.tick_params(labelsize=7)
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=7)
+def create_preprocessing_comparison(raw, processed):
+    """Side-by-side raw vs preprocessed (RGB histogram)."""
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6))
+    fig.suptitle('Perbandingan Histogram Sebelum & Sesudah Preprocessing', fontsize=11, fontweight='bold')
+
+    channel_colors = ['red', 'green', 'blue']
+    channel_labels = ['R', 'G', 'B']
+
+    for col, (img, title) in enumerate([(raw, 'Asli'), (processed, 'Setelah Preprocessing')]):
+        # Gambar
+        axes[0, col].imshow(img)
+        axes[0, col].set_title(title, fontsize=10, fontweight='bold')
+        axes[0, col].axis('off')
+        # Histogram RGB
+        for ch, (color, label) in enumerate(zip(channel_colors, channel_labels)):
+            hist = cv2.calcHist([img], [ch], None, [256], [0, 256])
+            axes[1, col].plot(hist, color=color, alpha=0.7, linewidth=1, label=label)
+        axes[1, col].set_xlim([0, 255])
+        axes[1, col].set_xlabel('Intensitas', fontsize=8)
+        axes[1, col].set_ylabel('Frekuensi', fontsize=8)
+        axes[1, col].legend(fontsize=8)
+        axes[1, col].grid(True, alpha=0.3)
+        axes[1, col].tick_params(labelsize=7)
+
     fig.tight_layout()
     return plot_to_base64(fig)
 
-def create_comparison_plot(source_cdf, target_cdf, result_cdf):
-    fig, ax = plt.subplots(figsize=(7, 3.5))
-    ax.plot(range(256), source_cdf, 'b-', label='Citra Asli', linewidth=1.5)
-    ax.plot(range(256), target_cdf, 'g-', label='Citra Target', linewidth=1.5)
-    ax.plot(range(256), result_cdf, 'r--', label='Hasil Specification', linewidth=2)
-    ax.set_title('Perbandingan CDF Ketiga Citra', fontsize=11, fontweight='bold')
-    ax.set_xlabel('Intensitas Piksel', fontsize=8)
-    ax.set_ylabel('CDF', fontsize=8)
-    ax.tick_params(labelsize=7)
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
+def create_confidence_gauge(confidence, predicted_class):
+    """Gauge/donut chart untuk confidence."""
+    fig, ax = plt.subplots(figsize=(4, 4), subplot_kw=dict(aspect="equal"))
+    val = confidence * 100
+    color = CLASS_COLORS[predicted_class]
+    wedge_data = [val, 100 - val]
+    wedge_colors = [color, '#eeeeee']
+    wedges, _ = ax.pie(wedge_data, colors=wedge_colors, startangle=90,
+                       wedgeprops=dict(width=0.4, edgecolor='white'))
+    ax.text(0, 0, f'{val:.1f}%', ha='center', va='center',
+            fontsize=20, fontweight='bold', color=color)
+    ax.set_title(f'Confidence\n{CLASS_LABELS_ID[predicted_class]}', fontsize=10, fontweight='bold', pad=5)
     fig.tight_layout()
     return plot_to_base64(fig)
 
-def histogram_specification_complete(source_img, target_img):
-    logs = []
-    logs.append("=" * 90)
-    logs.append(" " * 25 + "HISTOGRAM SPECIFICATION")
-    logs.append(" " * 28 + "ALGORITMA LENGKAP")
-    logs.append("=" * 90)
+# ─── INFERENCE ─────────────────────────────────────────────────────────────────
+def predict(img_rgb):
+    """
+    Input : numpy array RGB uint8
+    Output: dict hasil prediksi
+    """
+    processed = full_preprocess(img_rgb)
+    augmented = transform(image=processed)
+    tensor = augmented['image'].unsqueeze(0).to(device)
 
-    # Step 0: Konversi ke grayscale
-    if len(source_img.shape) == 3:
-        source_gray = cv2.cvtColor(source_img, cv2.COLOR_BGR2GRAY)
-        logs.append("\n[STEP 0] KONVERSI: Citra Asli (RGB) → Grayscale")
-    else:
-        source_gray = source_img.copy()
-        logs.append("\n[STEP 0] Citra Asli sudah Grayscale")
+    with torch.no_grad():
+        outputs = predictor_model(tensor)
+        probs_tensor = F.softmax(outputs, dim=1)
+        confidence, predicted_idx = torch.max(probs_tensor, 1)
 
-    if len(target_img.shape) == 3:
-        target_gray = cv2.cvtColor(target_img, cv2.COLOR_BGR2GRAY)
-        logs.append("[STEP 0] KONVERSI: Citra Target (RGB) → Grayscale")
-    else:
-        target_gray = target_img.copy()
-        logs.append("[STEP 0] Citra Target sudah Grayscale")
-
-    # Step 1: Hitung histogram — gunakan np.bincount, jauh lebih cepat dari double loop
-    logs.append("\n" + "=" * 90)
-    logs.append("LANGKAH 1: MENGHITUNG HISTOGRAM")
-    logs.append("=" * 90)
-
-    M, N = source_gray.shape
-    M_t, N_t = target_gray.shape
-    L = 256
-
-    logs.append(f"\nDIMENSI CITRA:")
-    logs.append(f"   Citra Asli: {M} x {N} = {M*N} piksel")
-    logs.append(f"   Citra Target: {M_t} x {N_t} = {M_t*N_t} piksel")
-    logs.append(f"   Level Intensitas (L): {L} (0 sampai 255)")
-
-    # np.bincount jauh lebih cepat dari double loop untuk gambar besar
-    source_hist = np.bincount(source_gray.ravel(), minlength=L).astype(np.float32)
-    target_hist = np.bincount(target_gray.ravel(), minlength=L).astype(np.float32)
-
-    # Step 2: Normalisasi (PDF)
-    logs.append("\n" + "=" * 90)
-    logs.append("LANGKAH 2: NORMALISASI HISTOGRAM (PDF)")
-    logs.append("=" * 90)
-    logs.append(f"\nRUMUS PDF: p(rk) = nk / (M x N)")
-
-    source_pdf = source_hist / (M * N)
-    target_pdf = target_hist / (M_t * N_t)
-
-    # Step 3: Hitung CDF
-    logs.append("\n" + "=" * 90)
-    logs.append("LANGKAH 3: HITUNG CDF (CUMULATIVE DISTRIBUTION FUNCTION)")
-    logs.append("=" * 90)
-    logs.append(f"\nRUMUS CDF: T(rk) = (L-1) x jumlah p(rj) dari j=0 sampai k")
-
-    source_cdf = np.cumsum(source_pdf)
-    target_cdf = np.cumsum(target_pdf)
-
-    # Step 4: Inverse mapping — gunakan np.searchsorted, O(256 log 256) vs O(256x256)
-    logs.append("\n" + "=" * 90)
-    logs.append("LANGKAH 4: MEMBUAT TABEL MAPPING (INVERSE MAPPING)")
-    logs.append("=" * 90)
-
-    # searchsorted mencari posisi insert yang menjaga urutan sorted,
-    # efeknya sama dengan argmin |target_cdf[z] - source_cdf[r]| tapi jauh lebih cepat
-    lookup_table = np.searchsorted(target_cdf, source_cdf).clip(0, 255).astype(np.uint8)
-
-    mapping_data = []
-    for r in range(20):
-        z = int(lookup_table[r])
-        mapping_data.append({
-            'r': r,
-            'cdf_s': float(source_cdf[r]),
-            'z': z,
-            'cdf_t': float(target_cdf[z]),
-            'error': float(abs(target_cdf[z] - source_cdf[r]))
-        })
-
-    # Step 5: Aplikasi transformasi
-    logs.append("\n" + "=" * 90)
-    logs.append("LANGKAH 5: APLIKASI TRANSFORMASI PADA CITRA")
-    logs.append("=" * 90)
-
-    result_img = cv2.LUT(source_gray, lookup_table)
-
-    # Verifikasi
-    logs.append("\n" + "=" * 90)
-    logs.append("VERIFIKASI HASIL")
-    logs.append("=" * 90)
-
-    result_hist = np.bincount(result_img.ravel(), minlength=L).astype(np.float32)
-    result_pdf = result_hist / result_img.size
-    result_cdf = np.cumsum(result_pdf)
-
-    verification_data = []
-    test_points = [0, 25, 50, 75, 100, 128, 150, 175, 200, 225, 255]
-    for val in test_points:
-        diff = abs(result_cdf[val] - target_cdf[val])
-        status = "MATCH" if diff < 0.05 else "CLOSE" if diff < 0.1 else "DIFF"
-        verification_data.append({
-            'intensity': val,
-            'cdf_source': float(source_cdf[val]),
-            'cdf_target': float(target_cdf[val]),
-            'cdf_result': float(result_cdf[val]),
-            'status': status
-        })
-
-    mse_cdf = float(np.mean((result_cdf - target_cdf) ** 2))
-    logs.append(f"\nMSE antara CDF Hasil dan CDF Target: {mse_cdf:.8f}")
+    predicted_class = CLASS_NAMES[predicted_idx.item()]
+    probabilities = {name: prob.item() for name, prob in zip(CLASS_NAMES, probs_tensor[0])}
 
     return {
-        'source_gray': source_gray,
-        'target_gray': target_gray,
-        'result_img': result_img,
-        'source_hist': source_hist,
-        'target_hist': target_hist,
-        'result_hist': result_hist,
-        'source_cdf': source_cdf,
-        'target_cdf': target_cdf,
-        'result_cdf': result_cdf,
-        'logs': logs,
-        'mapping_data': mapping_data,
-        'verification_data': verification_data,
-        'mse_cdf': mse_cdf
+        'predicted_class': predicted_class,
+        'predicted_label_id': CLASS_LABELS_ID[predicted_class],
+        'confidence': confidence.item(),
+        'probabilities': probabilities,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'raw_img': img_rgb,
+        'processed_img': processed,
     }
 
+# ─── ROUTES ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/process', methods=['POST'])
-def process():
-    if 'source' not in request.files or 'target' not in request.files:
-        return jsonify({'error': 'Kedua gambar harus diupload'}), 400
+@app.route('/predict', methods=['POST'])
+def predict_route():
+    if 'image' not in request.files:
+        return jsonify({'error': 'Gambar harus diupload'}), 400
 
-    source_file = request.files['source']
-    target_file = request.files['target']
-
-    if source_file.filename == '' or target_file.filename == '':
+    file = request.files['image']
+    if file.filename == '':
         return jsonify({'error': 'Tidak ada file yang dipilih'}), 400
 
     try:
-        source_bytes = np.frombuffer(source_file.read(), np.uint8)
-        target_bytes = np.frombuffer(target_file.read(), np.uint8)
+        file_bytes = np.frombuffer(file.read(), np.uint8)
+        img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-        source_img = cv2.imdecode(source_bytes, cv2.IMREAD_COLOR)
-        target_img = cv2.imdecode(target_bytes, cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            return jsonify({'error': 'Gagal membaca gambar. Pastikan format file valid (JPG/PNG).'}), 400
 
-        if source_img is None or target_img is None:
-            return jsonify({'error': 'Gagal membaca gambar. Pastikan format file valid.'}), 400
-
-        result = histogram_specification_complete(source_img, target_img)
+        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        result = predict(img_rgb)
 
         return jsonify({
-            'source':       img_to_base64(result['source_gray']),
-            'target':       img_to_base64(result['target_gray']),
-            'result':       img_to_base64(result['result_img']),
-            'hist_source':  create_histogram_plot(result['source_hist'], 'Histogram Citra Asli', 'blue'),
-            'hist_target':  create_histogram_plot(result['target_hist'], 'Histogram Citra Target', 'green'),
-            'hist_result':  create_histogram_plot(result['result_hist'], 'Histogram Hasil', 'red'),
-            'cdf_source':   create_cdf_plot(result['source_cdf'], 'CDF Citra Asli', 'blue', 'CDF Asli'),
-            'cdf_target':   create_cdf_plot(result['target_cdf'], 'CDF Citra Target', 'green', 'CDF Target'),
-            'cdf_result':   create_cdf_plot(result['result_cdf'], 'CDF Hasil', 'red', 'CDF Hasil'),
-            'comparison':   create_comparison_plot(result['source_cdf'], result['target_cdf'], result['result_cdf']),
-            'logs':             result['logs'],
-            'mapping_data':     result['mapping_data'],
-            'verification_data': result['verification_data'],
-            'mse_cdf':          result['mse_cdf']
+            'predicted_class':    result['predicted_class'],
+            'predicted_label_id': result['predicted_label_id'],
+            'confidence':         result['confidence'],
+            'probabilities':      result['probabilities'],
+            'timestamp':          result['timestamp'],
+            'img_raw':            img_to_base64(result['raw_img']),
+            'img_processed':      img_to_base64(result['processed_img']),
+            'chart_probs':        create_probability_bar(result['probabilities'], result['predicted_class']),
+            'chart_preprocess':   create_preprocessing_comparison(result['raw_img'], result['processed_img']),
+            'chart_gauge':        create_confidence_gauge(result['confidence'], result['predicted_class']),
         })
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

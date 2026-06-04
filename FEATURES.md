@@ -1,114 +1,110 @@
-# Fitur Lengkap Aplikasi Histogram Specification
+# Fitur Lengkap Aplikasi Coral Health Analyzer
 
 ## Fitur Utama
 
 ### 1. Upload Gambar
-- Upload gambar source (asli)
-- Upload gambar target
-- Preview gambar sebelum diproses
-- Support format: JPG, PNG, JPEG
-- Maksimal ukuran file: 16MB
+- Upload gambar terumbu karang (drag & drop atau klik)
+- Preview gambar sebelum dianalisis
+- Support format: JPG, PNG, WEBP
+- Maksimal ukuran file: 20MB
 
-### 2. Proses Histogram Specification
-Implementasi lengkap algoritma histogram specification dengan 5 langkah:
+### 2. Pipeline Preprocessing Underwater
 
-#### Langkah 0: Konversi ke Grayscale
-- Otomatis konversi gambar RGB ke grayscale
-- Deteksi jika gambar sudah grayscale
+Sebelum gambar masuk ke model, dilakukan 4 tahap preprocessing otomatis:
 
-#### Langkah 1: Menghitung Histogram
-- Hitung frekuensi setiap intensitas piksel (0-255)
-- Rumus: h(rₖ) = nₖ (jumlah piksel dengan intensitas rₖ)
+#### Tahap 1: White Balance
+- Koreksi warna menggunakan LAB color space
+- Menghilangkan color cast biru/hijau khas fotografi bawah air
 
-#### Langkah 2: Normalisasi Histogram (PDF)
-- Probability Density Function
-- Rumus: p(rₖ) = nₖ / (M × N)
+#### Tahap 2: Dehazing (Dark Channel Prior)
+- Estimasi atmospheric light dari dark channel image
+- Menghitung transmission map untuk koreksi kekeruhan air
+- Parameter: omega=0.95, t0=0.1
+- Rumus: J(x) = (I(x) - A) / t(x) + A
 
-#### Langkah 3: Hitung CDF
-- Cumulative Distribution Function
-- Rumus: T(rₖ) = (L-1) × Σⱼ₌₀ᵏ p(rⱼ)
+#### Tahap 3: CLAHE Enhancement
+- Contrast Limited Adaptive Histogram Equalization
+- clipLimit=2.0, tileGridSize=8×8
+- Meningkatkan detail dan kontras lokal tanpa over-amplification
 
-#### Langkah 4: Membuat Tabel Mapping (Inverse Mapping)
-- Cari nilai zₖ yang paling cocok untuk setiap rₖ
-- Algoritma: zₖ = argmin|CDF_target[z] - CDF_source[rₖ]|
+#### Tahap 4: Resize & Normalize
+- Resize ke 224×224 piksel (input ResNet-50)
+- Normalisasi dengan mean=[0.485, 0.456, 0.406] dan std=[0.229, 0.224, 0.225] (ImageNet)
 
-#### Langkah 5: Aplikasi Transformasi
-- Terapkan lookup table ke setiap piksel
-- s(i,j) = lookup_table[r(i,j)]
+### 3. Inferensi Model Deep Learning
 
-### 3. Visualisasi Hasil
+- **Arsitektur**: ResNet-50 (fine-tuned)
+- **Output**: 3 kelas kesehatan terumbu karang
+- **Framework**: PyTorch
+- **Device**: GPU (CUDA) jika tersedia, fallback ke CPU
 
-#### A. Gambar
-- Gambar asli (grayscale)
-- Gambar target (grayscale)
-- Gambar hasil specification
+#### Kelas Prediksi:
+| Kelas | Label Indonesia | Keterangan |
+|-------|----------------|------------|
+| Healthy | Sehat | Terumbu karang dalam kondisi baik |
+| Unhealthy | Tidak Sehat | Terumbu karang mengalami tekanan/pemutihan parsial |
+| Dead | Mati | Terumbu karang sudah tidak hidup |
 
-#### B. Histogram
-- Histogram citra asli (biru)
-- Histogram citra target (hijau)
-- Histogram hasil (merah)
+### 4. Visualisasi Hasil
 
-#### C. CDF (Cumulative Distribution Function)
-- CDF citra asli
-- CDF citra target
-- CDF hasil
-- Perbandingan ketiga CDF dalam satu grafik
+#### A. Verdict Card
+- Label kelas dalam Bahasa Indonesia
+- Warna indikator status (hijau / kuning / merah)
+- Nilai confidence dalam persen
+- Timestamp prediksi
 
-#### D. Tabel Data
+#### B. Distribusi Probabilitas
+- Progress bar per kelas (Sehat / Tidak Sehat / Mati)
+- Persentase tiap kelas ditampilkan secara real-time
+- Donut chart confidence (gauge)
+- Bar chart perbandingan ketiga kelas (matplotlib)
 
-**Tabel Mapping (20 nilai pertama):**
-- rₖ: Intensitas asli
-- CDF Source: Nilai CDF citra asli
-- zₖ: Intensitas hasil mapping
-- CDF Target: Nilai CDF citra target
-- Error: Selisih absolut CDF
+#### C. Perbandingan Gambar
+- Gambar original vs gambar setelah preprocessing (side-by-side)
 
-**Tabel Verifikasi (11 titik kunci):**
-- Intensitas: 0, 25, 50, 75, 100, 128, 150, 175, 200, 225, 255
-- CDF Asli, CDF Target, CDF Hasil
-- Status: ✓ MATCH, ~ CLOSE, atau ✗ DIFF
+#### D. Analisis Histogram Preprocessing
+- Histogram RGB gambar original vs setelah preprocessing
+- Visualisasi 4 panel: gambar + histogram per sisi
+- Memperlihatkan efek koreksi warna dan peningkatan kontras
 
-#### E. Metrik Evaluasi
-- MSE (Mean Squared Error) antara CDF hasil dan CDF target
-- Semakin mendekati 0, semakin baik
-
-#### F. Log Proses
-- Log lengkap setiap langkah algoritma
-- Penjelasan matematis
-- Contoh perhitungan
+#### E. Pipeline Steps
+- Penjelasan 4 langkah preprocessing yang dijalankan
+- Deskripsi teknis setiap tahap
 
 ## Desain UI
 
+- Style minimal hitam-putih, konsisten dan bersih
 - Responsive design (mobile-friendly)
-- Gradient background modern
-- Card-based layout
-- Smooth animations
-- Loading indicator
+- Drag & drop upload dengan visual feedback
+- Loading indicator dengan spinner
 - Error handling dengan pesan jelas
+- Tombol reset untuk analisis gambar baru
 
 ## Performa
 
-- Proses cepat dengan NumPy
-- Visualisasi real-time dengan Matplotlib
-- Efficient image encoding (base64)
-- Optimized chart generation
+- Model di-load sekali saat startup (tidak reload per request)
+- Preprocessing menggunakan OpenCV (cepat)
+- Inferensi dengan `torch.no_grad()` untuk efisiensi memori
+- Gambar di-resize sebelum encoding base64 untuk transfer ringan
 
-## Output
+## Output per Analisis
 
-Semua hasil dapat dilihat langsung di browser:
-1. Gambar hasil specification
-2. 6 grafik (3 histogram + 3 CDF)
-3. 1 grafik perbandingan CDF
-4. 2 tabel data (mapping + verifikasi)
-5. 1 nilai MSE
-6. Log proses lengkap
+Setiap analisis menghasilkan:
+1. Verdict kelas + confidence
+2. 3 probability bars
+3. 1 donut chart confidence
+4. 1 bar chart probabilitas
+5. 2 gambar (original + preprocessed)
+6. 1 grafik histogram perbandingan (4 panel)
+7. Ringkasan pipeline preprocessing
 
 ## Teknologi
 
 - **Backend**: Flask (Python)
-- **Image Processing**: OpenCV
+- **Model**: PyTorch + ResNet-50
+- **Preprocessing**: OpenCV, albumentations
+- **Visualisasi**: Matplotlib
 - **Numerical Computing**: NumPy
-- **Visualization**: Matplotlib
 - **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
 
 ## Kompatibilitas
@@ -116,4 +112,3 @@ Semua hasil dapat dilihat langsung di browser:
 - Desktop: Chrome, Firefox, Safari, Edge
 - Mobile: iOS Safari, Chrome Mobile
 - Tablet: iPad, Android Tablet
-

@@ -3,87 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histogram Specification</title>
+    <title>Coral Health Analyzer</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f5f5f5;
             min-height: 100vh;
             padding: 20px;
         }
+
         .container {
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
             background: white;
             border-radius: 2px;
             padding: 40px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        h1 {
+
+        /* ── HEADER ── */
+        .header {
             text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
             color: #000;
-            margin-bottom: 10px;
+            font-size: 26px;
             font-weight: 600;
             letter-spacing: -0.5px;
+            margin-bottom: 8px;
         }
-        .subtitle {
-            text-align: center;
+
+        .header .subtitle {
             color: #666;
-            margin-bottom: 40px;
             font-size: 14px;
         }
-        .upload-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
+
+        .badge-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
         }
-        .upload-box {
-            border: 2px solid #e0e0e0;
-            border-radius: 2px;
-            padding: 30px;
-            text-align: center;
-            transition: all 0.2s;
-        }
-        .upload-box:hover {
-            border-color: #333;
-            background: #fafafa;
-        }
-        .upload-box h3 {
-            color: #000;
-            margin-bottom: 20px;
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 500;
-            font-size: 16px;
         }
-        input[type="file"] {
-            display: none;
-        }
-        .file-label {
+
+        .badge-healthy  { background: #eafaf1; color: #27ae60; border: 1px solid #27ae60; }
+        .badge-unhealthy{ background: #fef9e7; color: #f39c12; border: 1px solid #f39c12; }
+        .badge-dead     { background: #fdedec; color: #e74c3c; border: 1px solid #e74c3c; }
+
+        .badge-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
             display: inline-block;
-            padding: 12px 24px;
-            background: #000;
-            color: white;
+        }
+        .badge-healthy  .badge-dot { background: #27ae60; }
+        .badge-unhealthy .badge-dot{ background: #f39c12; }
+        .badge-dead     .badge-dot { background: #e74c3c; }
+
+        /* ── UPLOAD ── */
+        .upload-area {
+            border: 2px dashed #d0d0d0;
             border-radius: 2px;
+            padding: 50px 30px;
+            text-align: center;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 14px;
+            position: relative;
+            margin-bottom: 24px;
         }
-        .file-label:hover {
-            background: #333;
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: #000;
+            background: #fafafa;
         }
-        .preview {
+
+        .upload-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+            color: #bbb;
+        }
+
+        .upload-area h3 {
+            color: #000;
+            font-weight: 500;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .upload-area p {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .preview-wrap {
+            display: none;
             margin-top: 20px;
+        }
+
+        .preview-wrap img {
+            max-height: 260px;
             max-width: 100%;
-            max-height: 200px;
             border-radius: 2px;
             border: 1px solid #e0e0e0;
+            object-fit: contain;
         }
-        .btn-process {
+
+        .preview-name {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* ── BUTTON ── */
+        .btn-analyze {
             display: block;
             width: 100%;
             padding: 16px;
@@ -94,424 +154,567 @@
             font-size: 16px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.2s;
         }
-        .btn-process:hover {
-            background: #333;
-        }
-        .btn-process:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .results {
-            margin-top: 40px;
-            display: none;
-        }
-        .results.show {
-            display: block;
-        }
-        .result-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        .result-item {
-            text-align: center;
-        }
-        .result-item h3 {
-            color: #000;
-            margin-bottom: 15px;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        .result-item img {
-            width: 100%;
-            border-radius: 2px;
-            border: 1px solid #e0e0e0;
-        }
-        .section-title {
-            background: #000;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 2px;
-            margin: 40px 0 20px 0;
-            text-align: left;
-            font-size: 14px;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-        .logs-container {
-            background: #fafafa;
-            border: 1px solid #e0e0e0;
-            border-radius: 2px;
-            padding: 20px;
-            margin-bottom: 40px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.6;
-            max-height: 500px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            color: #333;
-        }
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 40px;
-            background: white;
-            border: 1px solid #e0e0e0;
-        }
-        .data-table th {
-            background: #000;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: 500;
-            font-size: 13px;
-        }
-        .data-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #e0e0e0;
-            font-size: 13px;
-        }
-        .data-table tr:hover {
-            background: #fafafa;
-        }
-        .data-table tr:last-child td {
-            border-bottom: none;
-        }
-        .status-match {
-            color: #000;
-            font-weight: 600;
-        }
-        .status-close {
-            color: #666;
-            font-weight: 600;
-        }
-        .status-diff {
-            color: #999;
-            font-weight: 600;
-        }
-        .mse-box {
-            background: #fafafa;
-            border-left: 3px solid #000;
-            padding: 20px;
-            margin: 30px 0;
-            border-radius: 2px;
-        }
-        .mse-box strong {
-            color: #000;
-            font-size: 16px;
-            font-weight: 500;
-        }
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        .chart-item {
-            text-align: center;
-        }
-        .chart-item img {
-            width: 100%;
-            border-radius: 2px;
-            border: 1px solid #e0e0e0;
-        }
-        .comparison-chart {
-            text-align: center;
-            margin: 30px 0;
-        }
-        .comparison-chart img {
-            width: 100%;
-            max-width: 900px;
-            border-radius: 2px;
-            border: 1px solid #e0e0e0;
-        }
+
+        .btn-analyze:hover   { background: #333; }
+        .btn-analyze:disabled{ background: #ccc; cursor: not-allowed; }
+
+        /* ── LOADING ── */
         .loading {
             display: none;
             text-align: center;
             padding: 40px;
         }
-        .loading.show {
-            display: block;
-        }
+
+        .loading.show { display: block; }
+
         .spinner {
             border: 3px solid #f0f0f0;
             border-top: 3px solid #000;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            width: 44px;
+            height: 44px;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto 16px;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
+            0%   { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .error {
+
+        /* ── ERROR ── */
+        .error-box {
             background: #000;
             color: white;
-            padding: 15px 20px;
+            padding: 14px 18px;
             border-radius: 2px;
-            margin-bottom: 30px;
-            display: none;
+            margin-bottom: 24px;
             font-size: 14px;
+            display: none;
         }
-        .error.show {
-            display: block;
+
+        .error-box.show { display: block; }
+
+        /* ── RESULTS ── */
+        .results {
+            display: none;
+            margin-top: 40px;
         }
-        @media (max-width: 768px) {
-            .upload-section, .result-grid, .chart-grid {
-                grid-template-columns: 1fr;
-            }
-            .container {
-                padding: 20px;
-            }
+
+        .results.show { display: block; }
+
+        .section-title {
+            background: #000;
+            color: white;
+            padding: 11px 18px;
+            border-radius: 2px;
+            margin: 32px 0 18px 0;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* ── VERDICT CARD ── */
+        .verdict-card {
+            border-radius: 2px;
+            padding: 28px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .verdict-card.healthy   { background: #eafaf1; border: 2px solid #27ae60; }
+        .verdict-card.unhealthy { background: #fef9e7; border: 2px solid #f39c12; }
+        .verdict-card.dead      { background: #fdedec; border: 2px solid #e74c3c; }
+
+        .verdict-main .label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .verdict-main .class-name {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .verdict-main .class-en {
+            font-size: 14px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .verdict-card.healthy   .class-name { color: #27ae60; }
+        .verdict-card.unhealthy .class-name { color: #f39c12; }
+        .verdict-card.dead      .class-name { color: #e74c3c; }
+
+        .verdict-confidence {
+            text-align: right;
+        }
+
+        .verdict-confidence .conf-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .verdict-confidence .conf-value {
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .verdict-card.healthy   .conf-value { color: #27ae60; }
+        .verdict-card.unhealthy .conf-value { color: #f39c12; }
+        .verdict-card.dead      .conf-value { color: #e74c3c; }
+
+        .verdict-confidence .conf-time {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        /* ── PROB BARS ── */
+        .prob-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .prob-item label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .prob-bar-bg {
+            background: #f0f0f0;
+            border-radius: 2px;
+            height: 10px;
+            overflow: hidden;
+        }
+
+        .prob-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.6s ease;
+        }
+
+        .fill-healthy   { background: #27ae60; }
+        .fill-unhealthy { background: #f39c12; }
+        .fill-dead      { background: #e74c3c; }
+
+        /* ── IMAGE COMPARISON ── */
+        .img-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 8px;
+        }
+
+        .img-item {
+            text-align: center;
+        }
+
+        .img-item h4 {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .img-item img {
+            width: 100%;
+            border-radius: 2px;
+            border: 1px solid #e0e0e0;
+            object-fit: contain;
+        }
+
+        /* ── CHARTS ── */
+        .chart-full img,
+        .chart-row img {
+            width: 100%;
+            border-radius: 2px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .chart-two {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        /* ── PREPROCESS STEPS ── */
+        .steps-box {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 2px;
+            padding: 20px 24px;
+        }
+
+        .steps-box h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 14px;
+        }
+
+        .steps-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .step-num {
+            background: #000;
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .step-text strong {
+            font-size: 13px;
+            color: #000;
+        }
+
+        .step-text p {
+            font-size: 12px;
+            color: #666;
+            margin-top: 1px;
+        }
+
+        /* ── RESET ── */
+        .btn-reset {
+            margin-top: 32px;
+            display: inline-block;
+            padding: 11px 24px;
+            border: 2px solid #000;
+            color: #000;
+            background: white;
+            border-radius: 2px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-reset:hover {
+            background: #000;
+            color: white;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 680px) {
+            .container { padding: 20px; }
+            .img-grid, .chart-two { grid-template-columns: 1fr; }
+            .verdict-card { flex-direction: column; gap: 16px; }
+            .verdict-confidence { text-align: left; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Histogram Specification</h1>
-        <p class="subtitle">Upload dua gambar untuk melakukan histogram specification</p>
+<div class="container">
 
-        <div class="error" id="error"></div>
-
-        <div class="upload-section">
-            <div class="upload-box">
-                <h3>Gambar Asli (Source)</h3>
-                <label for="source" class="file-label">Pilih Gambar</label>
-                <input type="file" id="source" accept="image/*">
-                <div id="source-preview"></div>
-            </div>
-            <div class="upload-box">
-                <h3>Gambar Target</h3>
-                <label for="target" class="file-label">Pilih Gambar</label>
-                <input type="file" id="target" accept="image/*">
-                <div id="target-preview"></div>
-            </div>
-        </div>
-
-        <button class="btn-process" id="processBtn" disabled>Proses Histogram Specification</button>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Memproses gambar...</p>
-        </div>
-
-        <div class="results" id="results">
-            <h2 style="text-align: center; color: #000; margin-bottom: 30px; font-weight: 500;">Hasil Histogram Specification</h2>
-            
-            <div class="result-grid">
-                <div class="result-item">
-                    <h3>Gambar Asli</h3>
-                    <img id="resultSource" alt="Source">
-                </div>
-                <div class="result-item">
-                    <h3>Gambar Target</h3>
-                    <img id="resultTarget" alt="Target">
-                </div>
-                <div class="result-item">
-                    <h3>Hasil Specification</h3>
-                    <img id="resultOutput" alt="Result">
-                </div>
-            </div>
-
-            <div class="section-title">HISTOGRAM</div>
-            <div class="chart-grid">
-                <div class="chart-item">
-                    <img id="histSource" alt="Histogram Source">
-                </div>
-                <div class="chart-item">
-                    <img id="histTarget" alt="Histogram Target">
-                </div>
-                <div class="chart-item">
-                    <img id="histResult" alt="Histogram Result">
-                </div>
-            </div>
-
-            <div class="section-title">CDF (CUMULATIVE DISTRIBUTION FUNCTION)</div>
-            <div class="chart-grid">
-                <div class="chart-item">
-                    <img id="cdfSource" alt="CDF Source">
-                </div>
-                <div class="chart-item">
-                    <img id="cdfTarget" alt="CDF Target">
-                </div>
-                <div class="chart-item">
-                    <img id="cdfResult" alt="CDF Result">
-                </div>
-            </div>
-
-            <div class="section-title">PERBANDINGAN CDF</div>
-            <div class="comparison-chart">
-                <img id="comparisonChart" alt="CDF Comparison">
-            </div>
-
-            <div class="section-title">TABEL MAPPING (20 NILAI PERTAMA)</div>
-            <table class="data-table" id="mappingTable">
-                <thead>
-                    <tr>
-                        <th>rₖ</th>
-                        <th>CDF Source</th>
-                        <th>zₖ (Cocok)</th>
-                        <th>CDF Target</th>
-                        <th>Error</th>
-                    </tr>
-                </thead>
-                <tbody id="mappingTableBody">
-                </tbody>
-            </table>
-
-            <div class="section-title">VERIFIKASI HASIL</div>
-            <table class="data-table" id="verificationTable">
-                <thead>
-                    <tr>
-                        <th>Intensitas</th>
-                        <th>CDF Asli</th>
-                        <th>CDF Target</th>
-                        <th>CDF Hasil</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="verificationTableBody">
-                </tbody>
-            </table>
-
-            <div class="mse-box">
-                <strong>MSE (Mean Squared Error):</strong> <span id="mseValue"></span>
-                <br><small style="color: #666;">Semakin mendekati 0, semakin baik hasil specification</small>
-            </div>
-
-            <div class="section-title">LOG PROSES</div>
-            <div class="logs-container" id="logsContainer"></div>
+    <!-- HEADER -->
+    <div class="header">
+        <h1>Coral Health Analyzer</h1>
+        <p class="subtitle">Analisis kesehatan terumbu karang menggunakan deep learning (ResNet-50)</p>
+        <div class="badge-row">
+            <span class="badge badge-healthy">
+                <span class="badge-dot"></span> Sehat
+            </span>
+            <span class="badge badge-unhealthy">
+                <span class="badge-dot"></span> Tidak Sehat
+            </span>
+            <span class="badge badge-dead">
+                <span class="badge-dot"></span> Mati
+            </span>
         </div>
     </div>
 
-    <script>
-        let sourceFile = null;
-        let targetFile = null;
+    <!-- ERROR -->
+    <div class="error-box" id="errorBox"></div>
 
-        document.getElementById('source').addEventListener('change', function(e) {
-            sourceFile = e.target.files[0];
-            previewImage(sourceFile, 'source-preview');
-            checkFiles();
-        });
+    <!-- UPLOAD -->
+    <div class="upload-area" id="uploadArea">
+        <input type="file" id="imageInput" accept="image/*">
+        <span class="upload-icon">🪸</span>
+        <h3>Upload Gambar Terumbu Karang</h3>
+        <p>Klik atau seret gambar ke sini &nbsp;·&nbsp; JPG, PNG, WEBP</p>
+        <div class="preview-wrap" id="previewWrap">
+            <img id="previewImg" src="" alt="Preview">
+            <p class="preview-name" id="previewName"></p>
+        </div>
+    </div>
 
-        document.getElementById('target').addEventListener('change', function(e) {
-            targetFile = e.target.files[0];
-            previewImage(targetFile, 'target-preview');
-            checkFiles();
-        });
+    <button class="btn-analyze" id="analyzeBtn" disabled>Analisis Sekarang</button>
 
-        function previewImage(file, previewId) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const preview = document.getElementById(previewId);
-                preview.innerHTML = `<img src="${e.target.result}" class="preview" alt="Preview">`;
-            };
-            reader.readAsDataURL(file);
+    <!-- LOADING -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p style="color:#666; font-size:14px;">Memproses gambar & menjalankan model...</p>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="results">
+
+        <!-- VERDICT -->
+        <div class="section-title">HASIL PREDIKSI</div>
+        <div class="verdict-card" id="verdictCard">
+            <div class="verdict-main">
+                <div class="label">Status Terumbu Karang</div>
+                <div class="class-name" id="verdictClass"></div>
+                <div class="class-en" id="verdictClassEn"></div>
+            </div>
+            <div class="verdict-confidence">
+                <div class="conf-label">Confidence</div>
+                <div class="conf-value" id="verdictConf"></div>
+                <div class="conf-time" id="verdictTime"></div>
+            </div>
+        </div>
+
+        <!-- PROBABILITAS -->
+        <div class="section-title">DISTRIBUSI PROBABILITAS</div>
+        <div class="chart-two">
+            <div>
+                <div class="prob-list" id="probBars"></div>
+            </div>
+            <div class="chart-row">
+                <img id="chartGauge" alt="Confidence gauge">
+            </div>
+        </div>
+
+        <div style="margin-top:20px;" class="chart-full">
+            <img id="chartProbs" alt="Probability bar chart">
+        </div>
+
+        <!-- GAMBAR -->
+        <div class="section-title">GAMBAR ORIGINAL vs SETELAH PREPROCESSING</div>
+        <div class="img-grid">
+            <div class="img-item">
+                <h4>Gambar Original</h4>
+                <img id="imgRaw" alt="Original">
+            </div>
+            <div class="img-item">
+                <h4>Setelah Preprocessing</h4>
+                <img id="imgProcessed" alt="Preprocessed">
+            </div>
+        </div>
+
+        <!-- PREPROCESSING CHART -->
+        <div class="section-title">ANALISIS HISTOGRAM PREPROCESSING</div>
+        <div class="chart-full">
+            <img id="chartPreprocess" alt="Preprocessing comparison">
+        </div>
+
+        <!-- PIPELINE STEPS -->
+        <div class="section-title">PIPELINE PREPROCESSING</div>
+        <div class="steps-box">
+            <h4>Langkah-langkah yang dijalankan sebelum inferensi model:</h4>
+            <div class="steps-list">
+                <div class="step-item">
+                    <div class="step-num">1</div>
+                    <div class="step-text">
+                        <strong>White Balance</strong>
+                        <p>Koreksi warna menggunakan LAB color space untuk menghilangkan cast warna bawah air</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-num">2</div>
+                    <div class="step-text">
+                        <strong>Dehazing (Dark Channel Prior)</strong>
+                        <p>Menghilangkan kekaburan/turbiditas air dengan estimasi transmisi dan atmospheric light</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-num">3</div>
+                    <div class="step-text">
+                        <strong>CLAHE Enhancement</strong>
+                        <p>Contrast Limited Adaptive Histogram Equalization untuk meningkatkan detail lokal</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-num">4</div>
+                    <div class="step-text">
+                        <strong>Resize & Normalize</strong>
+                        <p>Resize ke 224×224, normalisasi dengan mean/std ImageNet untuk input ResNet-50</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESET -->
+        <div style="text-align:center;">
+            <button class="btn-reset" id="resetBtn">← Analisis Gambar Lain</button>
+        </div>
+
+    </div><!-- /results -->
+
+</div><!-- /container -->
+
+<script>
+    const imageInput  = document.getElementById('imageInput');
+    const uploadArea  = document.getElementById('uploadArea');
+    const previewWrap = document.getElementById('previewWrap');
+    const previewImg  = document.getElementById('previewImg');
+    const previewName = document.getElementById('previewName');
+    const analyzeBtn  = document.getElementById('analyzeBtn');
+    const loading     = document.getElementById('loading');
+    const results     = document.getElementById('results');
+    const errorBox    = document.getElementById('errorBox');
+
+    let selectedFile = null;
+
+    // ── Drag & drop visual ──────────────────────────────────
+    uploadArea.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) handleFile(file);
+    });
+
+    imageInput.addEventListener('change', e => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = e => {
+            previewImg.src = e.target.result;
+            previewName.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            previewWrap.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+        analyzeBtn.disabled = false;
+        results.classList.remove('show');
+        hideError();
+    }
+
+    // ── ANALYZE ─────────────────────────────────────────────
+    analyzeBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+
+        loading.classList.add('show');
+        results.classList.remove('show');
+        analyzeBtn.disabled = true;
+        hideError();
+
+        try {
+            const resp = await fetch('/predict', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (!resp.ok) throw new Error(data.error || 'Terjadi kesalahan server');
+
+            renderResults(data);
+            results.classList.add('show');
+            results.scrollIntoView({ behavior: 'smooth' });
+
+        } catch (err) {
+            showError('Error: ' + err.message);
+        } finally {
+            loading.classList.remove('show');
+            analyzeBtn.disabled = false;
         }
+    });
 
-        function checkFiles() {
-            const btn = document.getElementById('processBtn');
-            btn.disabled = !(sourceFile && targetFile);
-        }
+    // ── RENDER ───────────────────────────────────────────────
+    function renderResults(data) {
+        const cls = data.predicted_class.toLowerCase(); // healthy / unhealthy / dead
 
-        document.getElementById('processBtn').addEventListener('click', async function() {
-            const formData = new FormData();
-            formData.append('source', sourceFile);
-            formData.append('target', targetFile);
+        // Verdict card
+        const card = document.getElementById('verdictCard');
+        card.className = 'verdict-card ' + cls;
+        document.getElementById('verdictClass').textContent    = data.predicted_label_id;
+        document.getElementById('verdictClassEn').textContent  = data.predicted_class;
+        document.getElementById('verdictConf').textContent     = (data.confidence * 100).toFixed(1) + '%';
+        document.getElementById('verdictTime').textContent     = data.timestamp;
 
-            document.getElementById('loading').classList.add('show');
-            document.getElementById('results').classList.remove('show');
-            document.getElementById('error').classList.remove('show');
-
-            try {
-                const response = await fetch('/process', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Terjadi kesalahan');
-                }
-
-                // Display images
-                document.getElementById('resultSource').src = data.source;
-                document.getElementById('resultTarget').src = data.target;
-                document.getElementById('resultOutput').src = data.result;
-
-                // Display histograms
-                document.getElementById('histSource').src = data.hist_source;
-                document.getElementById('histTarget').src = data.hist_target;
-                document.getElementById('histResult').src = data.hist_result;
-
-                // Display CDFs
-                document.getElementById('cdfSource').src = data.cdf_source;
-                document.getElementById('cdfTarget').src = data.cdf_target;
-                document.getElementById('cdfResult').src = data.cdf_result;
-
-                // Display comparison chart
-                document.getElementById('comparisonChart').src = data.comparison;
-
-                // Display mapping table
-                const mappingTableBody = document.getElementById('mappingTableBody');
-                mappingTableBody.innerHTML = '';
-                data.mapping_data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${row.r}</td>
-                        <td>${row.cdf_s.toFixed(6)}</td>
-                        <td>${row.z}</td>
-                        <td>${row.cdf_t.toFixed(6)}</td>
-                        <td>${row.error.toFixed(6)}</td>
-                    `;
-                    mappingTableBody.appendChild(tr);
-                });
-
-                // Display verification table
-                const verificationTableBody = document.getElementById('verificationTableBody');
-                verificationTableBody.innerHTML = '';
-                data.verification_data.forEach(row => {
-                    const tr = document.createElement('tr');
-                    let statusClass = 'status-diff';
-                    if (row.status.includes('MATCH')) statusClass = 'status-match';
-                    else if (row.status.includes('CLOSE')) statusClass = 'status-close';
-                    
-                    tr.innerHTML = `
-                        <td>${row.intensity}</td>
-                        <td>${row.cdf_source.toFixed(6)}</td>
-                        <td>${row.cdf_target.toFixed(6)}</td>
-                        <td>${row.cdf_result.toFixed(6)}</td>
-                        <td class="${statusClass}">${row.status}</td>
-                    `;
-                    verificationTableBody.appendChild(tr);
-                });
-
-                // Display MSE
-                document.getElementById('mseValue').textContent = data.mse_cdf.toFixed(8);
-
-                // Display logs
-                document.getElementById('logsContainer').textContent = data.logs.join('\n');
-
-                document.getElementById('results').classList.add('show');
-                
-                // Scroll to results
-                document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-
-            } catch (error) {
-                const errorDiv = document.getElementById('error');
-                errorDiv.textContent = 'Error: ' + error.message;
-                errorDiv.classList.add('show');
-            } finally {
-                document.getElementById('loading').classList.remove('show');
-            }
+        // Probability bars
+        const fillMap = { Healthy: 'fill-healthy', Unhealthy: 'fill-unhealthy', Dead: 'fill-dead' };
+        const labelMap = { Healthy: 'Sehat', Unhealthy: 'Tidak Sehat', Dead: 'Mati' };
+        const probBarsEl = document.getElementById('probBars');
+        probBarsEl.innerHTML = '';
+        ['Healthy', 'Unhealthy', 'Dead'].forEach(c => {
+            const pct = (data.probabilities[c] * 100).toFixed(1);
+            const isBold = c === data.predicted_class ? ' style="color:#000;font-weight:700;"' : '';
+            probBarsEl.innerHTML += `
+                <div class="prob-item">
+                    <label${isBold}>
+                        <span>${labelMap[c]}</span>
+                        <span>${pct}%</span>
+                    </label>
+                    <div class="prob-bar-bg">
+                        <div class="prob-bar-fill ${fillMap[c]}" style="width:${pct}%"></div>
+                    </div>
+                </div>`;
         });
-    </script>
+
+        // Charts
+        document.getElementById('chartGauge').src      = data.chart_gauge;
+        document.getElementById('chartProbs').src      = data.chart_probs;
+        document.getElementById('chartPreprocess').src = data.chart_preprocess;
+
+        // Images
+        document.getElementById('imgRaw').src       = data.img_raw;
+        document.getElementById('imgProcessed').src = data.img_processed;
+    }
+
+    // ── RESET ────────────────────────────────────────────────
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        selectedFile = null;
+        imageInput.value = '';
+        previewWrap.style.display = 'none';
+        previewImg.src = '';
+        previewName.textContent = '';
+        analyzeBtn.disabled = true;
+        results.classList.remove('show');
+        hideError();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.add('show');
+    }
+
+    function hideError() {
+        errorBox.classList.remove('show');
+    }
+</script>
 </body>
 </html>
