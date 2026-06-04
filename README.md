@@ -135,7 +135,6 @@ project/
 ├── app.py                # Backend Flask dan seluruh logika algoritma
 ├── requirements.txt      # Daftar dependencies Python
 ├── vercel.json           # Konfigurasi deployment Vercel
-├── Procfile              # Konfigurasi deployment Heroku / Railway
 └── .gitignore
 ```
 
