@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 import cv2
 import numpy as np
 import os
@@ -195,15 +195,29 @@ def predict(img_rgb):
         'processed_img':      processed,
     }
 
+import base64 as _b64
+
+# ─── HELPER EMBED ASSETS ───────────────────────────────────────────────────────
+def _asset_b64(filename):
+    """Baca file dari folder assets dan kembalikan data URI base64."""
+    path = os.path.join(os.path.dirname(__file__), 'assets', filename)
+    try:
+        with open(path, 'rb') as f:
+            data = _b64.b64encode(f.read()).decode('utf-8')
+        ext = filename.rsplit('.', 1)[-1].lower()
+        mime = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg'}.get(ext, 'image/png')
+        return f"data:{mime};base64,{data}"
+    except Exception:
+        return ""
+
 # ─── ROUTES ────────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/assets/<path:filename>')
-def assets(filename):
-    assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
-    return send_from_directory(assets_dir, filename)
+    return render_template(
+        'index.html',
+        img_confusion=_asset_b64('confusion_matrix.png'),
+        img_train=_asset_b64('train.png'),
+    )
 
 @app.route('/predict', methods=['POST'])
 def predict_route():
