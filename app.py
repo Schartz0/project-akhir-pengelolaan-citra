@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import cv2
 import numpy as np
 import os
@@ -199,6 +199,11 @@ def predict(img_rgb):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/assets/<path:filename>')
+def assets(filename):
+    assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
+    return send_from_directory(assets_dir, filename)
 
 @app.route('/predict', methods=['POST'])
 def predict_route():

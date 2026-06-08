@@ -409,6 +409,156 @@
             margin-top: 1px;
         }
 
+        /* ── MODEL CARD ── */
+        .model-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 2px;
+            margin-bottom: 40px;
+            overflow: hidden;
+        }
+
+        .model-card-header {
+            background: #000;
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .model-card-header .model-icon {
+            font-size: 24px;
+        }
+
+        .model-card-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            margin: 0;
+        }
+
+        .model-card-header p {
+            font-size: 12px;
+            color: #aaa;
+            margin: 2px 0 0 0;
+        }
+
+        .model-card-body {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        /* Stat pills */
+        .model-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .model-stats h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-pill {
+            background: #fafafa;
+            border: 1px solid #e8e8e8;
+            border-radius: 2px;
+            padding: 12px 14px;
+        }
+
+        .stat-pill .stat-label {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-pill .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #000;
+            line-height: 1.2;
+            margin-top: 2px;
+        }
+
+        .stat-pill .stat-value.green  { color: #27ae60; }
+        .stat-pill .stat-value.yellow { color: #f39c12; }
+        .stat-pill .stat-value.red    { color: #e74c3c; }
+
+        /* Classification report table */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .report-table th {
+            background: #f5f5f5;
+            color: #555;
+            padding: 7px 10px;
+            text-align: right;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .report-table th:first-child { text-align: left; }
+
+        .report-table td {
+            padding: 6px 10px;
+            text-align: right;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+
+        .report-table td:first-child { text-align: left; font-weight: 500; }
+
+        .report-table tr:last-child td { border-bottom: none; }
+
+        .report-table tr.divider td {
+            border-top: 1px solid #e0e0e0;
+            background: #fafafa;
+            color: #555;
+        }
+
+        .report-table .val-high   { color: #27ae60; font-weight: 700; }
+        .report-table .val-mid    { color: #f39c12; font-weight: 700; }
+
+        /* Model charts row */
+        .model-charts {
+            padding: 0 24px 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .model-chart-item h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .model-chart-item img {
+            width: 100%;
+            border: 1px solid #e0e0e0;
+            border-radius: 2px;
+            display: block;
+        }
+
         /* ── RESET ── */
         .btn-reset {
             margin-top: 32px;
@@ -435,6 +585,9 @@
             .img-grid, .chart-two { grid-template-columns: 1fr; }
             .verdict-card { flex-direction: column; gap: 16px; }
             .verdict-confidence { text-align: left; }
+            .model-card-body { grid-template-columns: 1fr; }
+            .model-charts { grid-template-columns: 1fr; }
+            .stat-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -455,6 +608,149 @@
             <span class="badge badge-dead">
                 <span class="badge-dot"></span> Mati
             </span>
+        </div>
+    </div>
+
+    <!-- MODEL CARD -->
+    <div class="model-card">
+        <div class="model-card-header">
+            <span class="model-icon">🧠</span>
+            <div>
+                <h2>ResNet-50 — Coral Health Classifier</h2>
+                <p>Fine-tuned on underwater coral reef dataset &nbsp;·&nbsp; 3-class classification</p>
+            </div>
+        </div>
+
+        <div class="model-card-body">
+            <!-- Kiri: stats + report -->
+            <div class="model-stats">
+                <h3>Performa Model</h3>
+                <div class="stat-grid">
+                    <div class="stat-pill">
+                        <div class="stat-label">Akurasi</div>
+                        <div class="stat-value green">96%</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-label">Macro F1</div>
+                        <div class="stat-value green">0.96</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-label">Test Samples</div>
+                        <div class="stat-value">320</div>
+                    </div>
+                    <div class="stat-pill">
+                        <div class="stat-label">Arsitektur</div>
+                        <div class="stat-value" style="font-size:13px;">ResNet-50</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top:8px;">Classification Report</h3>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Kelas</th>
+                            <th>Precision</th>
+                            <th>Recall</th>
+                            <th>F1</th>
+                            <th>Support</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>🟢 Healthy</td>
+                            <td class="val-high">0.98</td>
+                            <td class="val-high">1.00</td>
+                            <td class="val-high">0.99</td>
+                            <td>132</td>
+                        </tr>
+                        <tr>
+                            <td>🟡 Unhealthy</td>
+                            <td class="val-mid">0.93</td>
+                            <td class="val-high">0.98</td>
+                            <td class="val-high">0.96</td>
+                            <td>102</td>
+                        </tr>
+                        <tr>
+                            <td>🔴 Dead</td>
+                            <td class="val-high">0.97</td>
+                            <td class="val-mid">0.88</td>
+                            <td class="val-mid">0.93</td>
+                            <td>86</td>
+                        </tr>
+                        <tr class="divider">
+                            <td>Accuracy</td>
+                            <td></td><td></td>
+                            <td class="val-high">0.96</td>
+                            <td>320</td>
+                        </tr>
+                        <tr class="divider">
+                            <td>Macro avg</td>
+                            <td class="val-high">0.96</td>
+                            <td class="val-high">0.95</td>
+                            <td class="val-high">0.96</td>
+                            <td>320</td>
+                        </tr>
+                        <tr class="divider">
+                            <td>Weighted avg</td>
+                            <td class="val-high">0.96</td>
+                            <td class="val-high">0.96</td>
+                            <td class="val-high">0.96</td>
+                            <td>320</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Kanan: class legend -->
+            <div>
+                <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:#888; margin-bottom:12px;">Kelas Target</h3>
+                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;">
+                    <div style="border-left:4px solid #27ae60; padding:10px 14px; background:#eafaf1; border-radius:0 2px 2px 0;">
+                        <div style="font-weight:700; color:#27ae60; font-size:14px;">🟢 Healthy — Sehat</div>
+                        <div style="font-size:12px; color:#555; margin-top:3px;">Terumbu karang hidup dengan warna cerah dan struktur utuh. Ekosistem berfungsi normal.</div>
+                    </div>
+                    <div style="border-left:4px solid #f39c12; padding:10px 14px; background:#fef9e7; border-radius:0 2px 2px 0;">
+                        <div style="font-weight:700; color:#f39c12; font-size:14px;">🟡 Unhealthy — Tidak Sehat</div>
+                        <div style="font-size:12px; color:#555; margin-top:3px;">Mengalami pemutihan parsial atau tekanan lingkungan. Warna memudar sebagian, struktur masih ada.</div>
+                    </div>
+                    <div style="border-left:4px solid #e74c3c; padding:10px 14px; background:#fdedec; border-radius:0 2px 2px 0;">
+                        <div style="font-weight:700; color:#e74c3c; font-size:14px;">🔴 Dead — Mati</div>
+                        <div style="font-size:12px; color:#555; margin-top:3px;">Terumbu karang sudah tidak hidup. Dominan putih/abu, tidak ada pigmentasi zooxanthellae.</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:0.8px; color:#888; margin-bottom:10px;">Detail Teknis</h3>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+                    <div style="background:#fafafa; border:1px solid #eee; padding:8px 10px; border-radius:2px;">
+                        <span style="color:#999;">Input size</span><br>
+                        <strong>224 × 224 px</strong>
+                    </div>
+                    <div style="background:#fafafa; border:1px solid #eee; padding:8px 10px; border-radius:2px;">
+                        <span style="color:#999;">Format model</span><br>
+                        <strong>ONNX Runtime</strong>
+                    </div>
+                    <div style="background:#fafafa; border:1px solid #eee; padding:8px 10px; border-radius:2px;">
+                        <span style="color:#999;">Normalisasi</span><br>
+                        <strong>ImageNet stats</strong>
+                    </div>
+                    <div style="background:#fafafa; border:1px solid #eee; padding:8px 10px; border-radius:2px;">
+                        <span style="color:#999;">Preprocessing</span><br>
+                        <strong>WB + Dehaze + CLAHE</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts row: confusion matrix + training curve -->
+        <div class="model-charts">
+            <div class="model-chart-item">
+                <h4>Confusion Matrix</h4>
+                <img src="/assets/confusion_matrix.png" alt="Confusion Matrix">
+            </div>
+            <div class="model-chart-item">
+                <h4>Training &amp; Validation Curve</h4>
+                <img src="/assets/train.png" alt="Training Curve">
+            </div>
         </div>
     </div>
 
